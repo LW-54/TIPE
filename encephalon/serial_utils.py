@@ -6,9 +6,12 @@ from typing import Tuple, Any
 from os import ttyname
 from pty import openpty
 
+#maybe add a update timeout function
 
-def serial_innit(port: int, baud: int = 9600) -> serial.Serial:
+
+def serial_innit(port: int, timeout: float = 0.5, baud: int = 9600) -> serial.Serial:
     serialInst = serial.Serial()
+    serialInst.timeout = timeout
     serialInst.baudrate = baud
     serialInst.port = port
     serialInst.open()
@@ -27,14 +30,13 @@ def select_port() -> int :
         raise Exception("No ports available")
 
 
-def select_port_innit(baud: int = 9600) -> serial.Serial:
-    return serial_innit(select_port(),baud)
+def select_port_innit(timeout: float = 0.5, baud: int = 9600) -> serial.Serial:
+    return serial_innit(select_port(), timeout, baud)
 
 
 
-def serial_read(serialInst: serial.Serial, timeout: float = 0.1) -> str | None:
+def serial_read(serialInst: serial.Serial) -> str | None:
     try: #think about error handling should it crash or return none or other?
-        serialInst.timeout = timeout  # look how it works is it global ? is there a need for a await function with explicit timeout handling?
         return serialInst.readline().decode('utf-8').strip() #how does it read ? what caracter does it stop at etc ,
     except Exception as e:
         print(f"Error reading from serial: {e}")
@@ -85,9 +87,9 @@ def sim_serial(baud: int = 9600) -> Tuple[int, int]:
     return  master, ttyname(slave)
 
 
-def sim_serial_innit(baud: int = 9600) -> Tuple[serial.Serial, int]:
+def sim_serial_innit(timeout: float = 0.5, baud: int = 9600) -> Tuple[serial.Serial, int]:
     master, slave = sim_serial(baud)
-    return master, serial_innit(slave)
+    return master, serial_innit(slave, timeout, baud)
 
 
 def sim_serial_read(port, timeout) :
