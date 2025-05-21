@@ -1,6 +1,7 @@
 import json
 import os
 from typing import Callable, Optional, Union
+from datetime import datetime
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -28,8 +29,8 @@ class NN:
         verbose: bool = False,
     ) -> None:
         
-        self.length = len(layers)
-        if self.length < 2:
+        self.layers = layers
+        if len(self.layers) < 2:
             raise ValueError("Network must have at least 2 layers (input and output).")
 
         self.serial = serial_interface
@@ -42,10 +43,10 @@ class NN:
 
         # Weights and biases: layer i connects layers[i-1] to layers[i]
         self.W = {
-            i: np.random.randn(layers[i - 1], layers[i]) * np.sqrt(2 / layers[i - 1])
-            for i in range(1, self.length)
+            i: np.random.randn(self.layers[i - 1], self.layers[i]) * np.sqrt(2 / self.layers[i - 1])
+            for i in range(1, len(self.layers))
         }
-        self.b = {i: np.zeros((1, layers[i])) for i in range(1, self.length)}
+        self.b = {i: np.zeros((1, self.layers[i])) for i in range(1, len(self.layers))}
 
         self._clip_weights_and_biases()
         self.set_weights_and_biases()
@@ -64,7 +65,7 @@ class NN:
     def set_weights_and_biases(self) -> None:
         payload = {
             "cmd": "set_weights_and_biases",
-            "W": {str(k): v.tolist() for k, v in self.W.items()},
+            "W": {str(i): v.tolist() for i, v in self.W.items()},
             "b": {str(k): v.tolist() for k, v in self.b.items()},
         }
         response = self.serial.send_and_receive(payload, expected_keys=["status"])
@@ -76,7 +77,7 @@ class NN:
             "cmd":"forward",
             "input": np.array(X, ndmin=2).tolist()         
         }, expected_keys=["output"])
-        return self.g(np.array(response["output"]))
+        return self.g(np.array(response["output"]), ndmin=2)
 
     def _forward_propagation(self, X: np.ndarray) -> tuple[np.ndarray, list[tuple[np.ndarray, np.ndarray]]]:
         cache = []
@@ -89,194 +90,156 @@ class NN:
         cache.append((A, Z))
         return self.use(X), cache
 
-    def _empty_grad(self) -> tuple[dict[int, np.ndarray], dict[int, np.ndarray]]:
-        return (
-            {i: np.zeros_like(self.W[i]) for i in self.W},
-            {i: np.zeros_like(self.b[i]) for i in self.b},
-        )
+    def _backward_propagation(
+        self,
+        output: np.ndarray,    # shape (m, n_L)
+        label: np.ndarray,     # shape (m, n_L)
+        cache: list[tuple[np.ndarray, np.ndarray]],  # [(A⁽⁰⁾, Z⁽¹⁾), …, (A⁽L⁻¹⁾, Z⁽L⁾)]
+        backward_loss: Callable[[np.ndarray, np.ndarray], np.ndarray],
+    ) -> tuple[dict[int, np.ndarray], dict[int, np.ndarray]]:
 
-    def _add_grad(
+        m = output.shape[0]             # batch size
+        L = len(self.layers) - 1        # number of weight layers
+
+        dW = {i: np.zeros_like(self.W[i]) for i in self.W}
+        db = {i: np.zeros_like(self.b[i]) for i in self.b}
+
+        # === Output layer ===
+        A_prev, Z = cache.pop()         # A_prev: (m, n_{L-1}), Z: (m, n_L)
+        delta = backward_loss(output, label)             # (m, n_L)
+        delta = self.backward_g(Z, delta)                # element-wise activation derivative
+
+        # Gradients for layer L
+        dW[L] = (A_prev.T @ delta) / m        # (n_{L-1}, m) @ (m, n_L) -> (n_{L-1}, n_L), averaged
+        db[L] = np.mean(delta, axis=0, keepdims=True)  # (1, n_L)
+
+        # === Hidden layers ===
+        for i in reversed(range(1, L)):
+            A_prev, Z = cache.pop()                    # A_prev: (m, n_{i-1}), Z: (m, n_i)
+            # propagate delta backward through weights and activation
+            delta = delta @ self.W[i + 1].T            # (m, n_{i+1}) @ (n_{i+1}, n_i) -> (m, n_i)
+            delta = self.backward_f(Z, delta)          # apply f'(Z)
+
+            # accumulate gradients, averaged over batch
+            dW[i] = (A_prev.T @ delta) / m              # (n_{i-1}, n_i)
+            db[i] = np.mean(delta, axis=0, keepdims=True)  # (1, n_i)
+
+        return dW, db
+
+    def _update_weights_and_biases(
         self,
         dW: dict[int, np.ndarray],
         db: dict[int, np.ndarray],
-        grads: tuple[dict[int, np.ndarray], dict[int, np.ndarray]],
-    ) -> tuple[dict[int, np.ndarray], dict[int, np.ndarray]]:
+        learning_rate: float,
+        lambda_reg: float,
+    ) -> None:
         for i in dW:
-            dW[i] += grads[0][i]
-            db[i] += grads[1][i]
-        return dW, db
+            self.W[i] -= learning_rate * (dW[i] + 2 * lambda_reg * self.W[i])
+            self.b[i] -= learning_rate * db[i]
+        self._clip_weights_and_biases()
+        self.set_weights_and_biases() 
 
-    def _divide_grad(
-        self, 
-        dW: dict[int, np.ndarray], 
-        db: dict[int, np.ndarray], 
-        n: Union[int, float]
-    ) -> tuple[dict[int, np.ndarray], dict[int, np.ndarray]]:
-        for i in dW:
-            dW[i] /= n
-            db[i] /= n
-        return dW, db
+    def save(self, filepath: str) -> None:
+        payload = {
+            "metadata": {
+                "name": self.name,
+                "timestamp": datetime.now().isoformat() + "Z",
+                "layers": self.layers,
+            },
+            "W": {str(i): self.W[i].tolist() for i in self.W},
+            "b": {str(i): self.b[i].tolist() for i in self.b},
+        }
+        with open(filepath, "w") as f:
+            json.dump(payload, f, indent=2)
+        self._log(f"[{self.name}] Saved to JSON: {filepath}")
 
-import numpy as np
-from typing import Callable
+    def load(self, filepath: str) -> None:
+        with open(filepath, "r") as f:
+            payload = json.load(f)
 
-def _backward_propagation(
-    self,
-    output: np.ndarray,    # shape (m, n_L)
-    label: np.ndarray,     # shape (m, n_L)
-    cache: list[tuple[np.ndarray, np.ndarray]],  # [(A⁽⁰⁾, Z⁽¹⁾), …, (A⁽L⁻¹⁾, Z⁽L⁾)]
-    backward_loss: Callable[[np.ndarray, np.ndarray], np.ndarray],
-) -> tuple[dict[int, np.ndarray], dict[int, np.ndarray]]:
+        # (Re)build internal structures
+        self.name = payload["metadata"].get("name", self.name)
+        self.layers = payload["metadata"]["layers"]
+        self.W = {int(i): np.array(payload["W"][i], ndmin=2) for i in payload["W"]}
+        self.b = {int(i): np.array(payload["b"][i], ndmin=2) for i in payload["b"]}
 
-    m = output.shape[0]             # batch size
-    dW, db = self._empty_grad()     # each dW[i], db[i] zero-arrays matching W[i], b[i]
-    L = self.length - 1             # number of weight layers
+        self._log(f"[{self.name}] Loaded from JSON: {filepath}")
 
-    # === Output layer ===
-    A_prev, Z = cache.pop()         # A_prev: (m, n_{L-1}), Z: (m, n_L)
-    delta = backward_loss(output, label)             # (m, n_L)
-    delta = self.backward_g(Z, delta)                # element-wise activation derivative
+    def train(
+        self,
+        data: np.ndarray,
+        labels: np.ndarray,
+        epochs: int,
+        learning_rate: float = 0.01,
+        learning_rate_optimiser: learning_rate_optimizer_type = fixed_learning_rate(),
+        loss_function: loss_function_type = mse,
+        lambda_reg: float = 0.0,
+        batch_size: int = 1,
+        saving: bool = False,
+        save_step: int = 1,
+        saving_improvement: float = 0.8,
+        loss_min_init: float = 0.001,
+        verbose: Optional[bool] = None,
+        print_step: int = 10,
+        graphing: bool = True,
+    ) -> None:
+        if verbose:
+            self.verbose = verbose
 
-    # Gradients for layer L
-    dW[L] = (A_prev.T @ delta) / m        # (n_{L-1}, m) @ (m, n_L) -> (n_{L-1}, n_L), averaged
-    db[L] = np.mean(delta, axis=0, keepdims=True)  # (1, n_L)
+        data, labels = np.array(data, ndmin=2), np.array(labels, ndmin=2)
+        samples = len(data)
+        if batch_size > samples: #maybe check for more conditions for the inputs
+            self._log("Batch size exceeded number of samples. Using full batch.")
+            batch_size = samples
+        
+        if graphing:
+            loss_history = []
+        
+        if saving:
+            loss_min = loss_min_init
+            directory = self.name + "_training"
+            os.makedirs(directory, exist_ok=True)
+            subdirectory = os.path.join(directory, str(np.datetime64('now')))
+            os.makedirs(subdirectory, exist_ok=True)
 
-    # === Hidden layers ===
-    for i in reversed(range(1, L)):
-        A_prev, Z = cache.pop()                    # A_prev: (m, n_{i-1}), Z: (m, n_i)
-        # propagate delta backward through weights and activation
-        delta = delta @ self.W[i + 1].T            # (m, n_{i+1}) @ (n_{i+1}, n_i) -> (m, n_i)
-        delta = self.backward_f(Z, delta)          # apply f'(Z)
+        for epoch in range(epochs):
+            loss = 0
+            indices = np.random.permutation(samples)
+            data, labels = data[indices], labels[indices]
 
-        # accumulate gradients, averaged over batch
-        dW[i] = (A_prev.T @ delta) / m              # (n_{i-1}, n_i)
-        db[i] = np.mean(delta, axis=0, keepdims=True)  # (1, n_i)
+            for i in range(0, samples, batch_size):
+                x_batch = data[i:i + batch_size]
+                y_batch = labels[i:i + batch_size]
 
-    return dW, db
+                output, cache = self._forward_propagation(x_batch)
+                loss += loss_function[0](output, y_batch)
+                dW, db = self._backward_propagation(output, y_batch, cache, loss_function[1])
+                learning_rate = learning_rate_optimiser(learning_rate, epoch, dW, db)
+                self._update_weights_and_biases(dW, db, learning_rate, lambda_reg)
 
-    
+            loss /= samples
+            if graphing:
+                loss_history.append(loss)
 
-#allow vectorisation  
-# input 1d array or list internaly convert to 2d array (1 x n) for matrix multiplication
-# function for a single forward step 
+            if (epoch + 1) % print_step == 0:
+                self._log(f"Epoch {epoch + 1}/{epochs} - Loss: {loss:.6e}")
+
+            if saving and (epoch + 1) % save_step == 0 and loss < loss_min:
+                loss_min = loss * saving_improvement
+                self.save(os.path.join(subdirectory, f"{self.name}_{loss:.6e}.json"))
+
+        if graphing:
+            plt.plot(range(1, epochs + 1), loss_history, label="Training Loss")
+            plt.xlabel("Epoch")
+            plt.ylabel("Loss")
+            plt.title("Training Loss Over Time")
+            plt.legend()
+            plt.grid()
+            plt.show()
+
+
+
+
 # see how i handle timeout delay
+# maybe graph live
 
-
-
-
-
-
-
-
-
-
-
-#     def update(
-#         self,
-#         dW: dict[int, np.ndarray],
-#         db: dict[int, np.ndarray],
-#         learning_rate: float = 0.01,
-#         lambda_reg: float = 0.01,
-#         timeout_delay: float = 1.0,
-#     ) -> None:
-#         for i in dW:
-#             self.W[i] -= learning_rate * (dW[i] + 2 * lambda_reg * self.W[i])
-#             self.b[i] -= learning_rate * db[i]
-#         self._clip_weights_and_biases()
-#         self.set_weights_and_biases(timeout_delay)
-
-#     def train(
-#         self,
-#         data: np.ndarray,
-#         labels: np.ndarray,
-#         epochs: int,
-#         learning_rate: float = 0.01,
-#         learning_rate_optimiser: learning_rate_optimizer_type = lambda lr, epoch, dW, db: lr,
-#         loss: loss_function_type = (
-#             lambda x, y: np.mean((x - y) ** 2),
-#             lambda x, y: 2 * (x - y) / np.size(y),
-#         ),
-#         lambda_reg: float = 0.0,
-#         batch_size: Optional[int] = None,
-#         saving: bool = False,
-#         save_step: int = 1,
-#         saving_improvement: float = 0.8,
-#         err_min_init: float = 0.001,
-#         printing: bool = True,
-#         print_step: int = 10,
-#         graphing: bool = True,
-#     ) -> None:
-#         samples = len(data)
-#         batch_size = batch_size or samples
-#         error_history = []
-#         err_min = err_min_init
-#         subdirectory = ""
-
-#         if saving:
-#             directory = self.name + "_training"
-#             os.makedirs(directory, exist_ok=True)
-#             subdirectory = os.path.join(directory, str(np.datetime64('now')))
-#             os.makedirs(subdirectory, exist_ok=True)
-
-#         for epoch in range(epochs):
-#             err = 0
-#             indices = np.random.permutation(samples)
-#             data, labels = data[indices], labels[indices]
-
-#             dW, db = self._empty_grad()
-#             for i in range(0, samples, batch_size):
-#                 x_batch = data[i:i + batch_size]
-#                 y_batch = labels[i:i + batch_size]
-
-#                 for x, y in zip(x_batch, y_batch):
-#                     output, cache = self._forward_propagation(x)
-#                     err += loss[0](output, y)
-#                     dW, db = self._add_grad(dW, db, self._backward_propagation(output, y, cache, loss[1]))
-
-#                 dW, db = self._divide_grad(dW, db, batch_size)
-#                 learning_rate = learning_rate_optimiser(learning_rate, epoch, dW, db)
-#                 self.update(dW, db, learning_rate, lambda_reg)
-
-#             err /= samples
-#             if graphing:
-#                 error_history.append(err)
-
-#             if printing and (epoch + 1) % print_step == 0:
-#                 print(f"Epoch {epoch + 1}/{epochs} - Error: {err:.6e}")
-
-#             if saving and (epoch + 1) % save_step == 0 and err < err_min:
-#                 err_min = err * saving_improvement
-#                 np.savez(os.path.join(subdirectory, f"{self.name}_{err:.6e}.npz"), W=self.W, b=self.b)
-
-#         if graphing:
-#             plt.plot(range(1, epochs + 1), error_history, label="Training Error")
-#             plt.xlabel("Epoch")
-#             plt.ylabel("Error")
-#             plt.title("Training Error Over Time")
-#             plt.legend()
-#             plt.grid()
-#             plt.show()
-
-# # Vectorized forward locally, before sending to Arduino
-# # Xbatch: (m, n_input)
-# Zs, As = [], []
-# A = Xbatch  # shape (m, n0)
-# for i in range(1, L):
-#     Z = A @ self.W[i] + self.b[i]     # Z: (m, n_i)
-#     A = self.f(Z)                     # A: (m, n_i)
-#     Zs.append(Z); As.append(A)
-
-# # Now you could send the **entire** batch of A as JSON:
-# resp = interface.send_and_receive({
-#     "cmd":"forward_batch",
-#     "inputs": A.tolist()              # list-of-lists, length m
-# }, expected_keys=["outputs"])
-
-# Yhat = np.array(resp["outputs"])      # shape (m, n_L)
-
-# err_batch = np.mean((Yhat - Ybatch)**2)     # vectorized
-# # Compute delta at output layer:
-# delta_L = 2*(Yhat - Ybatch)/m * g_prime(Zs[-1])  # (m, n_L)
-# # And so on, using matrix ops:
-# dW[L] = As[-2].T @ delta_L                   # (n_{L-1}, n_L)
-# db[L] = delta_L.sum(axis=0, keepdims=True)   # (1, n_L)
