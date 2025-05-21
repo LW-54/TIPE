@@ -82,26 +82,22 @@ def serial_monitor(serialInst: serial.Serial) -> None:
 
 
 
-def sim_serial(baud: int = 9600) -> Tuple[int, int]:
+def sim_serial() -> Tuple[int, int]:
     master, slave = openpty()
     return  master, ttyname(slave)
 
 
 def sim_serial_innit(timeout: float = 0.5, baud: int = 9600) -> Tuple[serial.Serial, int]:
-    master, slave = sim_serial(baud)
+    master, slave = sim_serial()
     return master, serial_innit(slave, timeout, baud)
 
 
-def sim_serial_read(port, timeout) :
+def sim_serial_read(port) :
     pass  
-    #         command = b""
-    #         while not command.endswith(b"\n"):
-    #             command += os.read(port, 1)
-    #         command = command.decode("utf-8").strip()
 
 
 def sim_serial_write(port, data) :
-    pass # os.write(port, f"Analog value on O{index}: {analog_value}\n".encode())
+    pass 
 
 
 def run_sim(sim , master): #do the typing expects a function
@@ -109,11 +105,8 @@ def run_sim(sim , master): #do the typing expects a function
     thread.start()
 
 
-def foo():
-    return 54
-
 def main():
-    ser = serial_innit()
+    ser = select_port_innit()
     print(ser)
 
 
