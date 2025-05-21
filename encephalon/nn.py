@@ -194,6 +194,14 @@ class NN:
         
         if graphing:
             loss_history = []
+            plt.ion()
+            fig, ax = plt.subplots()
+            line, = ax.plot([], [], label="Training Loss")
+            ax.set_xlabel("Epoch")
+            ax.set_ylabel("Loss")
+            ax.set_title(f"{self.name} Training Loss over Epochs")
+            ax.legend()
+            ax.grid(True)
         
         if saving:
             loss_min = loss_min_init
@@ -218,8 +226,17 @@ class NN:
                 self._update_weights_and_biases(dW, db, learning_rate, lambda_reg)
 
             loss /= samples
+
             if graphing:
                 loss_history.append(loss)
+                # update data
+                line.set_data(range(1, epoch + 1), loss_history)
+                # adapt axes
+                ax.relim()
+                ax.autoscale_view()
+                # redraw and pause briefly
+                fig.canvas.draw()
+                plt.pause(0.001)
 
             if (epoch + 1) % print_step == 0:
                 self._log(f"Epoch {epoch + 1}/{epochs} - Loss: {loss:.6e}")
@@ -229,17 +246,12 @@ class NN:
                 self.save(os.path.join(subdirectory, f"{self.name}_{loss:.6e}.json"))
 
         if graphing:
-            plt.plot(range(1, epochs + 1), loss_history, label="Training Loss")
-            plt.xlabel("Epoch")
-            plt.ylabel("Loss")
-            plt.title("Training Loss Over Time")
-            plt.legend()
-            plt.grid()
+            plt.ioff()
             plt.show()
 
 
 
 
 # see how i handle timeout delay
-# maybe graph live
+
 
