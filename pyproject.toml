@@ -1,9 +1,19 @@
 [project]
-name = "tipe"
+name = "TIPE"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
+    "matplotlib>=3.10.3",
     "numpy>=2.2.6",
+    "pyserial>=3.5",
 ]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3.5",
+]
+
+# [project.scripts]
+# my-package = "my_package:main" launch serial communication console
