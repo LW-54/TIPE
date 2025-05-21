@@ -1,7 +1,9 @@
+
 import json
 import os
 from typing import Callable, Optional, Union
 from datetime import datetime
+import warnings
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -29,6 +31,13 @@ class NN:
         verbose: bool = False,
     ) -> None:
         
+        if not all(isinstance(n, int) and n > 0 for n in layers):
+            raise ValueError("All layer sizes must be positive integers.")
+        if not isinstance(serial_interface, SerialJSONInterface):
+            raise TypeError("serial_interface must be a SerialJSONInterface instance.")
+        if not callable(f[0]) or not callable(f[1]) or not callable(g[0]) or not callable(g[1]):
+            raise TypeError("Activation functions f and g must be (function, derivative) tuples.")
+
         self.layers = layers
         if len(self.layers) < 2:
             raise ValueError("Network must have at least 2 layers (input and output).")
@@ -73,9 +82,13 @@ class NN:
             raise SerialProtocolError(f"Arduino failed to load weights and biases: {response}")
 
     def use(self, X: np.ndarray) -> np.ndarray:
+        X = np.array(X, ndmin=2)
+        if X.shape[1] != self.layers[0]:
+            raise ValueError(f"Input dimension {X.shape[1]} does not match network input size {self.layers[0]}")
+
         response = self.serial.send_and_receive({
             "cmd":"forward",
-            "input": np.array(X, ndmin=2).tolist()         
+            "input": X.tolist()         
         }, expected_keys=["output"])
         return self.g(np.array(response["output"]), ndmin=2)
 
@@ -187,10 +200,33 @@ class NN:
             self.verbose = verbose
 
         data, labels = np.array(data, ndmin=2), np.array(labels, ndmin=2)
-        samples = len(data)
-        if batch_size > samples: #maybe check for more conditions for the inputs
-            self._log("Batch size exceeded number of samples. Using full batch.")
+
+        samples, n_in = data.shape
+        m, n_out = labels.shape
+
+        if m != samples:
+            raise ValueError(f"Data has {samples} samples but labels has {m}")
+        if n_out != self.layers[-1]:
+            raise ValueError(
+                f"Label dimension ({n_out}) must match network output size ({self.layers[-1]})"
+            )
+        if epochs < 1:
+            raise ValueError("epochs must be ≥ 1")
+        if learning_rate <= 0:
+            raise ValueError("learning_rate must be > 0")
+        if batch_size < 1:
+            warnings.warn("batch_size < 1, using batch_size = 1")
+            batch_size = 1
+        if batch_size > samples:
+            warnings.warn("batch_size > num_samples, using full batch")
             batch_size = samples
+        if not callable(learning_rate_optimiser):
+            raise TypeError("learning_rate_optimiser must be a callable")
+        if (not isinstance(loss_function, tuple)
+            or len(loss_function) != 2
+            or not callable(loss_function[0])
+            or not callable(loss_function[1])):
+            raise TypeError("loss_function must be (loss, loss_derivative) tuple of callables")
         
         if graphing:
             loss_history = []
@@ -248,10 +284,3 @@ class NN:
         if graphing:
             plt.ioff()
             plt.show()
-
-
-
-
-# see how i handle timeout delay
-
-
