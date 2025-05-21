@@ -1,3 +1,4 @@
+
 from typing import Callable
 import numpy as np
 
@@ -27,25 +28,25 @@ tanh: activation_function_type = (
     lambda x, y: (1 - np.tanh(x)**2) * y
 )
 
-def forward_softmax(x: np.ndarray) -> np.ndarray:
-    tmp = np.exp(x)
-    return tmp / np.sum(tmp)
 
-def backward_softmax(x: np.ndarray, y: np.ndarray) -> np.ndarray:
-    tmp = np.exp(x)
-    o = tmp / np.sum(tmp)
-    n = np.size(o)
-    return np.dot(y, (np.identity(n) - o.T) * o)
+def forward_softmax(x: np.ndarray) -> np.ndarray:
+    shifted = x - np.max(x, axis=1, keepdims=True)
+    exps    = np.exp(shifted)
+    return exps / np.sum(exps, axis=1, keepdims=True)
+
+def backward_softmax(x: np.ndarray, delta: np.ndarray) -> np.ndarray:
+    y = forward_softmax(x)
+    return y * (delta - np.sum(delta * y, axis=1, keepdims=True))
 
 softmax: activation_function_type = (
-    forward_softmax,
+    forward_softmax, 
     backward_softmax
 )
 
 # Loss functions
 mse: loss_function_type = (
     lambda x, y: np.mean(np.power(y - x, 2)),
-    lambda x, y: 2 * (x - y) / np.size(y)
+    lambda x, y: 2 * (x - y) / x.shape[1]
 )
 
 # Learning rate optimizers
