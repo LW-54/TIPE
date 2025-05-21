@@ -134,7 +134,7 @@ class SerialJSONInterface:
         if expected_keys:
             missing = [key for key in expected_keys if key not in data]
             if missing:
-                raise SerialProtocolError(f"Missing keys in response: {missing}")
+                raise SerialProtocolError(f"Missing keys in response: {missing}, got {data}")
 
         return data
 

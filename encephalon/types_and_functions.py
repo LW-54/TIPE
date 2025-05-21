@@ -54,7 +54,7 @@ def fixed_learning_rate() -> learning_rate_optimizer_type:
     return lambda learning_rate, epoch, dW, db: learning_rate
 
 def time_based_decay(func: Callable[[int], float]) -> learning_rate_optimizer_type:
-    return lambda learning_rate, epoch, dW, db: func(epoch)
+    return lambda learning_rate, epoch, dW, db: learning_rate * func(epoch)
 
 def exponential_decay(k: int | float) -> learning_rate_optimizer_type:
     return time_based_decay(lambda x: np.exp(-k * x))

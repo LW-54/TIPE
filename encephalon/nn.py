@@ -83,6 +83,7 @@ class NN:
 
     def use(self, X: np.ndarray) -> np.ndarray:
         X = np.array(X, ndmin=2)
+
         if X.shape[1] != self.layers[0]:
             raise ValueError(f"Input dimension {X.shape[1]} does not match network input size {self.layers[0]}")
 
@@ -90,6 +91,7 @@ class NN:
             "cmd":"forward",
             "input": X.tolist()         
         }, expected_keys=["output"])
+        
         return self.g(np.array(response["output"]), ndmin=2)
 
     def _forward_propagation(self, X: np.ndarray) -> tuple[np.ndarray, list[tuple[np.ndarray, np.ndarray]]]:

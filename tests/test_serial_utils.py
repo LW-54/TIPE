@@ -35,7 +35,7 @@ def test_missing_key():
     sim.start()
 
     with pytest.raises(SerialProtocolError):
-        interface.send_and_receive({"cmd": "SET"}, expected_keys=["expected"])
+        interface.send_and_receive({"cmd": "X"}, expected_keys=["expected"])
 
     sim.stop()
     interface.close()
@@ -62,7 +62,7 @@ def test_timeout_response():
     def no_response(_msg):
         return None  # simulator sends no reply
 
-    interface, sim = simulate_serial(no_response, timeout=0.2)
+    interface, sim = simulate_serial(no_response, timeout=0.1)
     sim.start()
 
     with pytest.raises(SerialTimeoutError):
