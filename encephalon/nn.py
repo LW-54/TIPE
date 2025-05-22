@@ -8,8 +8,8 @@ import warnings
 import matplotlib.pyplot as plt
 import numpy as np
 
-from serial_utils import SerialJSONInterface, SerialProtocolError, SerialTimeoutError
-from types_and_functions import (
+from .serial_utils import SerialJSONInterface, SerialProtocolError, SerialTimeoutError
+from .types_and_functions import (
     activation_function_type,
     loss_function_type,
     learning_rate_optimizer_type,
@@ -91,8 +91,8 @@ class NN:
             "cmd":"forward",
             "input": X.tolist()         
         }, expected_keys=["output"])
-        
-        return self.g(np.array(response["output"]), ndmin=2)
+
+        return self.g(np.array(response["output"], ndmin=2))
 
     def _forward_propagation(self, X: np.ndarray) -> tuple[np.ndarray, list[tuple[np.ndarray, np.ndarray]]]:
         cache = []
@@ -101,8 +101,6 @@ class NN:
             Z = A @ self.W[i] + self.b[i]
             cache.append((A, Z))
             A = self.f(Z)
-        Z = A @ self.W[len(self.layers) - 1] + self.b[len(self.layers) - 1]
-        cache.append((A, Z))
         return self.use(X), cache
 
     def _backward_propagation(

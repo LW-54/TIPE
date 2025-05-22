@@ -2,7 +2,7 @@
 import json
 from typing import Callable
 import numpy as np
-from types_and_functions import activation_function_type, ReLU, Id, mse
+from .types_and_functions import activation_function_type, ReLU, Id, mse
 
 #add possibility to set and read specefic pins
 
