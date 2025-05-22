@@ -13,7 +13,7 @@ def nn_with_sim():
     cb = make_arduino_simulator(layers, f=ReLU, noise_amplitude=0.0)
     interface, sim = simulate_serial(cb)
     sim.start()
-    model = NN(layers, serial_interface=interface, f=ReLU, g=Id, verbose=False)
+    model = NN(interface, layers, f=ReLU, g=Id, verbose=False)
     yield model
     sim.stop()
     interface.close()

@@ -11,5 +11,7 @@
 
   packages = [
     pkgs.cowsay
+    pkgs.python311Packages.tkinter
+    pkgs.zlib
   ];
 }

@@ -5,6 +5,8 @@ from typing import Callable, Optional, Union
 from datetime import datetime
 import warnings
 
+import matplotlib
+matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -23,8 +25,8 @@ from .types_and_functions import (
 class NN:
     def __init__(
         self,
-        layers: list[int],
         serial_interface: SerialJSONInterface,
+        layers: list[int],
         name: str = "unnamed_model",
         f: activation_function_type = ReLU,
         g: activation_function_type = Id,
@@ -266,13 +268,13 @@ class NN:
             if graphing:
                 loss_history.append(loss)
                 # update data
-                line.set_data(range(1, epoch + 1), loss_history)
+                line.set_data(range(1, epoch + 2), loss_history)
                 # adapt axes
                 ax.relim()
                 ax.autoscale_view()
                 # redraw and pause briefly
                 fig.canvas.draw()
-                plt.pause(0.001)
+                plt.pause(0.0001)
 
             if (epoch + 1) % print_step == 0:
                 self._log(f"Epoch {epoch + 1}/{epochs} - Loss: {loss:.6e}")
