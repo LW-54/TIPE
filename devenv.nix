@@ -9,9 +9,10 @@
     venv.enable = true;
   };
 
-  packages = [
-    pkgs.cowsay
-    pkgs.python311Packages.tkinter
-    pkgs.zlib
+  packages = with pkgs; [
+    cowsay
+    python311Packages.tkinter
+    zlib
+    arduino-cli
   ];
 }
