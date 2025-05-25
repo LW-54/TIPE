@@ -109,7 +109,7 @@ void processJson(const String &json) {
     DynamicJsonDocument doc(4096);
     auto err = deserializeJson(doc, json);
     if (err) {
-        DynamicJsonDocument r(64); r["error"]="JSON parse error";
+        DynamicJsonDocument r(64); r["error"]="JSON parse error"; // also send the error
         serializeJson(r, Serial); Serial.println(); return;
     }
     const char* cmd = doc["cmd"];
@@ -138,7 +138,8 @@ void processJson(const String &json) {
             JsonArray vals = arr;
             if (arr.size()>0 && arr[0].is<JsonArray>()) vals = arr[0].as<JsonArray>();
             for (size_t i=0;i<vals.size();i++){
-                if (!setVoltage(b(layer,i), vals[i] + Vref/2.0)){
+                float val = vals[i];
+                if (!setVoltage(b(layer,i), val + Vref/2.0)){
                     DynamicJsonDocument r(64);
                     r["error"] = "Invalid b";
                     serializeJson(r,Serial);Serial.println(); return;
@@ -187,11 +188,11 @@ void processJson(const String &json) {
         if (param && param[0]=='W'){
             int L,R,C;
             if (sscanf(param+1, "%d:%d:%d", &L,&R,&C)==3)
-                ok2=setVoltage(W(L,R,C), value+Vref/2.0);
+                ok2=setVoltage(W(L,R,C), value);
         } else if (param && param[0]=='b'){
             int L,C;
             if (sscanf(param+1, "%d:%d", &L,&C)==2)
-                ok2=setVoltage(b(L,C), value+Vref/2.0);
+                ok2=setVoltage(b(L,C), value);
         } else if (param && param[0]=='I'){
             int idx;
             if (sscanf(param+1, "%d", &idx)==1)
@@ -227,3 +228,23 @@ void loop() {
         processJson(cmd);
     }
 }
+
+/*
+Comands for attaching to WSL2
+-----------------------------
+usbipd list
+usbipd bind --busid 2-2
+usbipd attach --wsl --busid 2-2
+lsusb
+usbipd detach --busid 2-2
+wsl --shutdown
+*/
+
+// move uses to applications folder
+// get arduino setup to work again
+// write ANN_sim.ino
+// search for problem datasets that can be solved by extremly small Neural networks
+// test sim on found problem or perceptron chien chat
+// reajust circuit to current code and vice versa 
+// tools for giving data the right shape for the circuit and problem
+// tools in python and arduino for graphing different components 

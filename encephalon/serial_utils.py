@@ -280,3 +280,14 @@ def simulate_serial(response_callback: Callable[[Dict[str, Any]], Dict[str, Any]
         raise SerialCommunicationError(f"Failed to open simulated serial port {slave_name}: {e}")
     simulator = SerialSimulator(master_fd, response_callback)
     return SerialJSONInterface(serial_inst=serial_inst), simulator
+
+"""
+Comands for attaching to WSL2
+-----------------------------
+usbipd list
+usbipd bind --busid 1-2
+usbipd attach --wsl --busid 1-2
+lsusb
+usbipd detach --busid 1-2
+wsl --shutdown
+"""
