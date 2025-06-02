@@ -1,20 +1,28 @@
 [project]
-name = "TIPE"
-version = "0.1.0"
-description = "Add your description here"
-readme = "README.md"
+name            = "TIPE"
+version         = "0.1.0"
+description     = "Add your description here"
+readme          = "README.md"
 requires-python = ">=3.11"
 dependencies = [
-    "ipykernel>=6.29.5",
-    "matplotlib>=3.10.3",
-    "numpy>=2.2.6",
-    "pyserial>=3.5",
+  "ipykernel>=6.29.5",
+  "matplotlib>=3.10.3",
+  "numpy>=2.2.6",
+  "pyserial>=3.5",
+  "scikit-learn>=1.6.1",
 ]
 
 [dependency-groups]
 dev = [
-    "pytest>=8.3.5",
+  "pytest>=8.3.5",
 ]
 
 # [project.scripts]
-# my-package = "my_package:main" launch serial communication console
+# xor = "applications.xor_nn"
+
+[tool.hatch.build]
+packages = ["encephalon"]
+
+[build-system]
+requires      = ["hatchling>=1.0"]
+build-backend = "hatchling.build"

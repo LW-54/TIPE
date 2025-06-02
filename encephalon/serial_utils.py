@@ -281,6 +281,21 @@ def simulate_serial(response_callback: Callable[[Dict[str, Any]], Dict[str, Any]
     simulator = SerialSimulator(master_fd, response_callback)
     return SerialJSONInterface(serial_inst=serial_inst), simulator
 
+def handshake(interface : SerialJSONInterface, max_retries: int = 3, retry_delay: float = 1.0) -> None:
+    for attempt in range(1, max_retries+1):
+        try:
+            interface.send_command({"cmd": "handshake"})
+            resp = interface.receive_response(expected_keys=["status"])
+            if resp.get("status") == "ready":
+                print("Handshake successful")
+                return
+            else:
+                raise SerialCommunicationError(f"Unexpected handshake response: {resp}")
+        except SerialTimeoutError:
+            if attempt == max_retries:
+                raise SerialCommunicationError("Handshake failed: no response after retries")
+            time.sleep(retry_delay)
+
 """
 Comands for attaching to WSL2
 -----------------------------

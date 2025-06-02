@@ -80,6 +80,10 @@ void readAllOutputs(JsonArray &outer) {
     }
 }
 
+const int LED_PIN = LED_BUILTIN;
+
+bool is_ready = false;
+
 //=========================
 // Setup
 //=========================
@@ -100,6 +104,29 @@ void setup() {
     if (!ok) {
         while (1); // Halt if any DAC failed
     }
+    pinMode(LED_PIN, OUTPUT);
+    digitalWrite(LED_PIN, LOW);
+}
+
+void loop() {
+    if (!is_ready && Serial.available()) {
+    String str = Serial.readStringUntil('\n');
+    DynamicJsonDocument hd(256);
+    if (deserializeJson(hd, str) == DeserializationError::Ok) {
+      const char* c = hd["cmd"];
+      if (c && String(c) == "handshake") {
+        Serial.println("{\"status\":\"ready\"}");
+        while (Serial.available()) Serial.read();
+        is_ready = true;
+        digitalWrite(LED_PIN, HIGH); 
+      }
+    }
+    return;
+  }
+    if (is_ready && Serial.available()) {
+    String cmd = Serial.readStringUntil('\n');
+    processJson(cmd);
+  }
 }
 
 //=========================
@@ -109,12 +136,16 @@ void processJson(const String &json) {
     DynamicJsonDocument doc(4096);
     auto err = deserializeJson(doc, json);
     if (err) {
-        DynamicJsonDocument r(64); r["error"]="JSON parse error"; // also send the error
+        DynamicJsonDocument r(64); 
+        r["error"]="JSON parse error"; 
+        r["received"] = json;
         serializeJson(r, Serial); Serial.println(); return;
     }
     const char* cmd = doc["cmd"];
     if (!cmd) {
-        DynamicJsonDocument r(64); r["error"]="No cmd specified";
+        DynamicJsonDocument r(64); 
+        r["error"]="No cmd specified";
+        r["received"] = json;
         serializeJson(r, Serial); Serial.println(); return;
     }
 
@@ -127,6 +158,7 @@ void processJson(const String &json) {
                     if (!setVoltage(W(layer,i,j), val + Vref/2.0)){
                         DynamicJsonDocument r(64);
                         r["error"] = "Invalid W";
+                        r["received"] = json;
                         serializeJson(r,Serial);Serial.println(); return;
                     }
                 }
@@ -142,6 +174,7 @@ void processJson(const String &json) {
                 if (!setVoltage(b(layer,i), val + Vref/2.0)){
                     DynamicJsonDocument r(64);
                     r["error"] = "Invalid b";
+                    r["received"] = json;
                     serializeJson(r,Serial);Serial.println(); return;
                 }
             }
@@ -166,6 +199,7 @@ void processJson(const String &json) {
                 if (!setVoltage(I(i), v)) {
                     DynamicJsonDocument e(64);
                     e["error"] = "Invalid input";
+                    e["received"] = json;
                     serializeJson(e, Serial);
                     Serial.println();
                     return;
@@ -211,32 +245,27 @@ void processJson(const String &json) {
         if (ch<6) {
             int v=analogRead(ch);
             r["value"] = v * Vref / 1023.0;
-        } else r["error"]="Invalid output index";
+        } else r["error"]="Invalid output index"; 
         serializeJson(r,Serial);Serial.println();
         return;
     }
 
     else {
-        DynamicJsonDocument r(64); r["error"]="Unknown command";
+        DynamicJsonDocument r(64); r["error"]="Unknown command"; r["received"] = json;
         serializeJson(r,Serial); Serial.println();
     }
 }
 
-void loop() {
-    if (Serial.available()) {
-        String cmd = Serial.readStringUntil('\n');
-        processJson(cmd);
-    }
-}
+
 
 /*
 Comands for attaching to WSL2
 -----------------------------
 usbipd list
-usbipd bind --busid 2-2
-usbipd attach --wsl --busid 2-2
+usbipd bind --busid 1-2
+usbipd attach --wsl --busid 1-2
 lsusb
-usbipd detach --busid 2-2
+usbipd detach --busid 1-2
 wsl --shutdown
 */
 

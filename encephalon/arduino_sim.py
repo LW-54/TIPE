@@ -33,7 +33,10 @@ def make_arduino_simulator(
     def callback(msg: dict) -> dict:
         cmd = msg.get("cmd", "")
         try:
-            if cmd == "set_weights_and_biases":
+            if cmd == "handshake":
+                return {"status": "ready"}
+
+            elif cmd == "set_weights_and_biases":
                 W_in = msg["W"]
                 b_in = msg["b"]
                 for k, v in W_in.items():

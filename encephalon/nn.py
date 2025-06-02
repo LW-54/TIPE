@@ -93,7 +93,8 @@ class NN:
             "cmd":"forward",
             "input": X.tolist()         
         }, expected_keys=["output"])
-
+        # if np.any(np.abs(np.array(response["output"], ndmin=2)) > 2.5) : #comment out
+        #     self._log("value with amplitude over 5")
         return self.g(np.array(response["output"], ndmin=2))
 
     def _forward_propagation(self, X: np.ndarray) -> tuple[np.ndarray, list[tuple[np.ndarray, np.ndarray]]]:
