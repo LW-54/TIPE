@@ -21,14 +21,25 @@ class Grapher:
 
     def _log(self, msg: str) -> None:
         if self.verbose:
-            print(f"[{self.name}] {msg}")
+            print(f"[Grapher] {msg}")
 
-    def graph(self, X: np.ndarray) -> np.ndarray:
+    # def graph(self, X: np.ndarray) -> np.ndarray: #il faudrer trouver le bug
+    #     X = np.array(X, ndmin=2)
+    #     return np.array((self.serial.send_and_receive({
+    #         "cmd":"graph",
+    #         "input": X.tolist()         
+    #     }, expected_keys=["output"]))["output"], ndmin=2)
+
+    def graph(self, X: np.ndarray, out : int = 0) -> np.ndarray:
         X = np.array(X, ndmin=2)
-        return np.array((self.serial.send_and_receive({
-            "cmd":"graph",
-            "input": X.tolist()         
-        }, expected_keys=["output"]))["output"], ndmin=2)
+        Y = []
+        n,m = X.shape
+        for i in range(n):
+            for j in range(m):
+                self.set(j,X[i][j])
+            Y.append(self.read(out))
+            self._log(f"{i+1}/{n}")
+        return np.array(Y, ndmin=2) # dim not realy necessary
 
 
     def set(self, pin : int, v : float) -> None:

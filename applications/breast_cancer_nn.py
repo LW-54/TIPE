@@ -56,7 +56,7 @@ handshake(interface)
 bcn = NN(interface, layers, name="bcn", f=f, g=g, verbose=True)
 
 # ─── 7) TRAIN ON THE TRAINING SET ─────────────────────────────────────────────
-bcn.train(X_train, y_train, epochs=1000, batch_size=10, graphing=False)
+bcn.train(X_train, y_train, epochs=1000, batch_size=50, graphing=False)
 
 
 

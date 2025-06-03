@@ -72,7 +72,7 @@ circle_net.train(
     y_train,
     epochs=1000,      # you can experiment with more/less epochs
     batch_size=10,
-    graphing=True
+    graphing=False
 )
 
 # ─── 8) EVALUATE ON THE TEST SET ──────────────────────────────────────────────
@@ -107,8 +107,8 @@ to_plot = [
             n=100,     # finer grid for a crisp boundary
             boundary=0.5,
             # pass all points (normalized) so we can color‐code inner (0) vs. outer (1)
-            data_0=[x for x, y in zip(X_norm.tolist(), labels_all) if y == [1]],
-            data_1=[x for x, y in zip(X_norm.tolist(), labels_all) if y == [0]],
+            data_0=[x for x, y in zip(X_norm.tolist(), labels_all) if y == [0]],
+            data_1=[x for x, y in zip(X_norm.tolist(), labels_all) if y == [1]],
         ),
     ),
 ]

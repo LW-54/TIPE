@@ -47,6 +47,9 @@ def graph_2d(
     x_min: float = 0,
     x_max: float = 5, 
     n: int = 20, 
+    xlabel : str = "x",
+    ylabel : str = "y",
+    title : str = "Network plot",
     ax=None, 
     fig=None, 
     nrows: Optional[int] = None, 
@@ -64,6 +67,10 @@ def graph_2d(
             ax = fig.add_subplot(nrows,ncols,index)
 
     ax.plot(X.flatten(),model.use(X).flatten(),) # flatten to (n,)
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel(ylabel)
+    ax.set_title(title)
+
 
 
 def graph_3d(
@@ -73,6 +80,10 @@ def graph_3d(
     y_min: float = 0, 
     y_max: float = 5, 
     n: int = 20, 
+    xlabel : str = "x",
+    ylabel : str = "y",
+    zlabel : str = "z",
+    title : str = "Network surface",
     ax=None, 
     fig=None, 
     nrows: Optional[int] = None, 
@@ -96,6 +107,12 @@ def graph_3d(
             ax = fig.add_subplot(nrows,ncols,index,projection="3d")
 
     ax.scatter(grid[:, 0], grid[:, 1], points, c=points, cmap="winter")
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel(ylabel)
+    ax.set_zlabel(zlabel)
+    ax.set_title(title)
+
+
 
 
 def decision_boundary(
@@ -108,6 +125,11 @@ def decision_boundary(
     boundary: float = 2.5, 
     data_0: Optional[np.ndarray] = None, 
     data_1: Optional[np.ndarray] = None, 
+    xlabel : str = "x",
+    ylabel : str = "y",
+    title : str = "Decision Boundary",
+    class0name : str = "Class 0",
+    class1name : str = "Class 1",
     ax=None, 
     fig=None, 
     nrows: Optional[int] = None, 
@@ -140,14 +162,14 @@ def decision_boundary(
 
     if data_0 is not None:
         data_0 = np.array(data_0)
-        ax.scatter(data_0[:, 0], data_0[:, 1], c='b', label="Class 0")
+        ax.scatter(data_0[:, 0], data_0[:, 1], c='b', label=class0name)
     if data_1 is not None:
         data_1 = np.array(data_1)
-        ax.scatter(data_1[:, 0], data_1[:, 1], c='r', label="Class 1")
+        ax.scatter(data_1[:, 0], data_1[:, 1], c='r', label=class1name)
 
-    ax.set_xlabel("x")
-    ax.set_ylabel("y")
-    ax.set_title("Decision Boundary")
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel(ylabel)
+    ax.set_title(title)
     ax.legend()
     ax.grid(True)
 

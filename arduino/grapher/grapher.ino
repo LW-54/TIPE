@@ -138,7 +138,6 @@ void processJson(const String &json) {
 
         // Forward propagation: always batch (nested arrays)
     else if (strcmp(cmd, "graph")==0) {
-        Serial.println("bite");
         JsonArray batch = doc["input"].as<JsonArray>();
         DynamicJsonDocument r(4096);
         JsonArray outOuter = r.createNestedArray("output");
