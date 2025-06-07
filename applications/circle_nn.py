@@ -96,6 +96,7 @@ to_plot = [
             x_min=0.0, x_max=1.0,
             y_min=0.0, y_max=1.0,
             n=50,      # 50×50 grid for a smooth surface
+            title="Surface du réseau cercles",
         ),
     ),
     (
@@ -109,6 +110,7 @@ to_plot = [
             # pass all points (normalized) so we can color‐code inner (0) vs. outer (1)
             data_0=[x for x, y in zip(X_norm.tolist(), labels_all) if y == [0]],
             data_1=[x for x, y in zip(X_norm.tolist(), labels_all) if y == [1]],
+            title="Frontière de déscision du réseau cercles",
         ),
     ),
 ]

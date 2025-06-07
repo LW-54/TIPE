@@ -48,8 +48,8 @@ class SerialJSONInterface:
     """
     def __init__(self,
                  port: Optional[Union[str, int]] = None,
-                 baud: int = 9600,
-                 timeout: float = 0.5,
+                 baud: int = 115200,
+                 timeout: float = 1,
                  serial_inst: Optional[Any] = None):
         """
         Initialize the serial interface.
@@ -249,7 +249,7 @@ class SerialSimulator:
 
 
 def simulate_serial(response_callback: Callable[[Dict[str, Any]], Dict[str, Any]],
-                    baud: int = 9600,
+                    baud: int = 115200,
                     timeout: float = 0.5) -> Tuple[SerialJSONInterface, SerialSimulator]:
     """
     Create a pseudo-serial interface and simulator for testing.

@@ -17,14 +17,14 @@ if True :
     interface, sim = simulate_serial(make_arduino_simulator(layers, f=f, noise_amplitude=0))
     sim.start()
 else :
-    interface = SerialJSONInterface(port="/dev/ttyACM0", baud=9600, timeout=1.0)
+    interface = SerialJSONInterface(port="/dev/ttyACM0")
 
 handshake(interface)
 
 xor = NN(interface, layers, name="xor", f=f, g=g, verbose=True)
 
 
-xor.train(data, labels, epochs=1000, batch_size=1, graphing=True)
+xor.train(data, labels, epochs=1000, batch_size=1, graphing=False)
 
 
 print(xor.use([1,1]))
@@ -37,8 +37,8 @@ print(xor.use([0,0]))
 
 
 to_plot = [
-    (graph_3d, dict(model=xor, x_min=0, x_max=1, y_min=0, y_max=1, n=20,)),
-    (decision_boundary, dict(model=xor, x_min=0, x_max=1, y_min=0, y_max=1, n=50, boundary=0.5, data_0=[[1,1], [0,0]], data_1=[[0,1], [1,0]])),
+    (graph_3d, dict(model=xor, x_min=0, x_max=1, y_min=0, y_max=1, n=30, xlabel="A", ylabel="B", zlabel="Y", title="Surface du réseau XOR")),
+    (decision_boundary, dict(model=xor, x_min=0, x_max=1, y_min=0, y_max=1, n=50, boundary=0.5, data_0=[[1,1], [0,0]], data_1=[[0,1], [1,0]], xlabel="A", ylabel="B", title="Frontière de déscision du réseau XOR")),
 ]
 
 auto_subplot(1, 2, to_plot, figsize=(10, 5))
@@ -56,3 +56,6 @@ interface.close()
 #other logical functions
 #maybe something more scientific (chemistry) conductivity
 #make code to plot components
+
+
+#extraire et montrer le gradiant

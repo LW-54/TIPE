@@ -2,18 +2,29 @@
 #include <Adafruit_MCP4725.h>
 #include <ArduinoJson.h>
 
-#define TCA9548A_ADDR 0x70   // I2C multiplexer address
-#define NUM_DACS       5     // Number of DACs connected
-#define Vref           5.0   // DAC/ADC reference voltage
+#define Vref      5.0
+// I2C addresses for the two TCA9548A multiplexers
+#define MUX_ADDR1 0x70
+#define MUX_ADDR2 0x71
 
-Adafruit_MCP4725 dac[NUM_DACS];
+// Number of DACs per multiplexer
+#define DAC_PER_MUX 7 //6
+// Total number of DACs (flat array size)
+#define TOTAL_DACS (DAC_PER_MUX * 2)
 
-// Selects the channel on the TCA9548A I2C multiplexer
-void selectTCAChannel(uint8_t channel) {
-    if (channel > 7) return;
-    Wire.beginTransmission(TCA9548A_ADDR);
-    Wire.write(1 << channel);
-    Wire.endTransmission();
+// Flat array of 14 DAC objects (indices 0–13)
+Adafruit_MCP4725 dac[TOTAL_DACS];
+
+/**
+ * Selects a channel (0–7) on the given TCA9548A.
+ * Writes a byte with only that bit set to the multiplexer’s control register.
+ * E.g., write (1 << channel) to select that channel:contentReference[oaicite:3]{index=3}.
+ */
+void tcaselect(uint8_t muxAddr, uint8_t channel) {
+  if (channel > 7) return;          // Invalid channel
+  Wire.beginTransmission(muxAddr);
+  Wire.write(1 << channel);
+  Wire.endTransmission();
 }
 
 //=========================
@@ -21,14 +32,14 @@ void selectTCAChannel(uint8_t channel) {
 //=========================
 
 struct InputMap { uint8_t index, channel; };
-InputMap input_map[] = {{0,0},{1,1},{2,2},{3,3},{5,5}};;
+InputMap input_map[] = {{0,0},{1,1},{2,2},{3,3},{4,4},{5,5},{6,6},{7,7},{8,8},{9,9},{10,10},{11,11},{12,12},{13,13}};
 uint8_t I(uint8_t idx) {
     for (auto &i : input_map) if (i.index==idx) return i.channel;
     return 255;
 }
 
 struct OutputMap { uint8_t index, channel; };
-OutputMap output_map[] = {{0,0},{1,1},{2,2},{3,3},{5,5}};
+OutputMap output_map[] = {{0,0},{1,1},{2,2},{3,3},{4,4},{5,5}};
 uint8_t O(uint8_t idx) {
     for (auto &o : output_map) if (o.index==idx) return o.channel;
     return 255;
@@ -39,12 +50,29 @@ uint8_t O(uint8_t idx) {
 //=========================
 // Sets the specified DAC channel to a given voltage (0–Vref)
 // Returns true if success, false if invalid channel or voltage out of range
-bool setVoltage(uint8_t channel, float voltage) {
-    if (channel >= NUM_DACS) return false;
+bool setVoltage(uint8_t index, float voltage) {
+    if (index >= TOTAL_DACS) return false;
     if (voltage < 0.0 || voltage > Vref) return false;
     uint16_t value = (voltage / Vref) * 4095;
-    selectTCAChannel(channel);
-    dac[channel].setVoltage(value, false);
+    // Determine multiplexer and channel from index
+    uint8_t muxAddr;
+    uint8_t channel;
+    if (index < DAC_PER_MUX) {
+    muxAddr = MUX_ADDR1;          // Use first multiplexer
+    channel = index;              // Channels 0–6
+    } else {
+    muxAddr = MUX_ADDR2;          // Use second multiplexer
+    channel = index - DAC_PER_MUX; // Channels 0–6 for indices 7–13
+    }
+
+    // Select the appropriate channel and set DAC output
+    tcaselect(muxAddr, channel);
+    dac[index].setVoltage(value, false);  // Write voltage to the DAC
+
+    // Deselect (disable) all channels on this multiplexer by writing 0
+    Wire.beginTransmission(muxAddr);
+    Wire.write(0);
+    Wire.endTransmission();
     return true;
 }
 
@@ -78,19 +106,42 @@ void setup() {
     Serial.begin(9600);
     Wire.begin();
     bool ok = true;
-    for (uint8_t i = 0; i < NUM_DACS; i++) {
-        selectTCAChannel(i);
-        if (!dac[i].begin(0x62)) {
+
+    // Initialize 7 DACs on first multiplexer (address 0x70)
+    for (uint8_t ch = 0; ch < DAC_PER_MUX; ch++) {
+        tcaselect(MUX_ADDR1, ch);        // Enable channel ch on first MUX
+        if (!dac[ch].begin(0x62)) {
             ok = false;
             DynamicJsonDocument err(64);
-            err["error"] = "DAC init failed on channel " + String(i);
+            err["error"] = "DAC init failed on channel " + String(ch) + " MUX " + String(MUX_ADDR1);
             serializeJson(err, Serial);
             Serial.println();
-        }
+        }           // Default address for MCP4725 (A0=GND)
     }
+    // Initialize 7 DACs on second multiplexer (address 0x71)
+    for (uint8_t ch = 0; ch < DAC_PER_MUX; ch++) {
+        tcaselect(MUX_ADDR2, ch);        // Enable channel ch on second MUX
+        if (!dac[DAC_PER_MUX + ch].begin(0x62)) {
+            ok = false;
+            DynamicJsonDocument err(64);
+            err["error"] = "DAC init failed on channel " + String(DAC_PER_MUX + ch) + " MUX " + String(MUX_ADDR2);
+            serializeJson(err, Serial);
+            Serial.println();
+        }           // Default address for MCP4725 (A0=GND)
+    }
+    
     if (!ok) {
         while (1); // Halt if any DAC failed
     }
+
+    // Deselect all channels on both multiplexers (write 0 to disable all)
+    Wire.beginTransmission(MUX_ADDR1);
+    Wire.write(0);
+    Wire.endTransmission();
+    Wire.beginTransmission(MUX_ADDR2);
+    Wire.write(0);
+    Wire.endTransmission();
+
     pinMode(LED_PIN, OUTPUT);
     digitalWrite(LED_PIN, LOW);
 }
@@ -189,7 +240,7 @@ void processJson(const String &json) {
         if (ch<6) {
             int v=analogRead(ch);
             r["value"] = v * Vref / 1023.0;
-        } else r["error"]="Invalid output index"; 
+        } else {r["error"]="Invalid output index"; r["received"] = json;}
         serializeJson(r,Serial);Serial.println();
         return;
     }

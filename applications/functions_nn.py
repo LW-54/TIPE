@@ -1,39 +1,48 @@
 import numpy as np
 
 from encephalon.nn import NN
-from encephalon.types_and_functions import ReLU, Id, tanh
-from encephalon.serial_utils import simulate_serial
+from encephalon.types_and_functions import Id, tanh
+from encephalon.serial_utils import simulate_serial, SerialJSONInterface, handshake
 from encephalon.arduino_sim import make_arduino_simulator
 from encephalon.representations import auto_subplot, graph_2d
 
-dim = 1
 
-x_min, x_max= -np.pi*4, np.pi*4
+func = np.sin
 
-data = np.random.uniform(x_min, x_max, (64*10**2, dim))
-labels = np.sin(data)
+x_min,x_max,n = 0, np.pi, 25 #
+
+data = np.linspace(x_min,x_max,n).reshape(-1,1)  # shape: (n, 1)
+
+labels = func(data)
 
 
 name = "foo"
 
-layers, f, g = [dim, 16*dim, 16*dim, dim], tanh, tanh
+layers, f, g = [1,3,1], tanh, Id
 
-interface, sim = simulate_serial(make_arduino_simulator(layers, f=f, noise_amplitude=0.0))
-sim.start()
+if False :
+    interface, sim = simulate_serial(make_arduino_simulator(layers, f=f, noise_amplitude=0))
+    sim.start()
+else :
+    interface = SerialJSONInterface(port="/dev/ttyACM0")
 
-func = NN(interface, layers, name=name, f=f, g=g, verbose=True)
+handshake(interface)
 
 
-func.train(data, labels, epochs=1000, batch_size=64, graphing=False)
+model = NN(interface, layers, name=name, f=f, g=g, verbose=True)
 
+
+model.train(data, labels, epochs=1000, batch_size=1, graphing=False)
+
+print(model.W)
+print(model.b)
 
 to_plot = [
-    (graph_2d, dict(model=func, x_min=x_min, x_max=x_max, n=100,)),
+    (graph_2d, dict(model=model, x_min=x_min, x_max=x_max, n=25, func=func,)),
 ]
 
 auto_subplot(1, 1, to_plot, figsize=None)
 
 
-
-sim.stop()
 interface.close()
+sim.stop()

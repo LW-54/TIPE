@@ -2,46 +2,72 @@
 #include <Adafruit_MCP4725.h>
 #include <ArduinoJson.h>
 
-#define TCA9548A_ADDR 0x70   // I2C multiplexer address
-#define NUM_DACS       5     // Number of DACs connected
-#define Vref           5.0   // DAC/ADC reference voltage
+#define Vref      5.0
+#define BYTES     512
+// I2C addresses for the two TCA9548A multiplexers
+#define MUX_ADDR1 0x70
+#define MUX_ADDR2 0x71
 
-Adafruit_MCP4725 dac[NUM_DACS];
+// Number of DACs per multiplexer
+#define DAC_PER_MUX 6
+// Total number of DACs (flat array size)
+#define TOTAL_DACS (DAC_PER_MUX * 2)
 
-// Selects the channel on the TCA9548A I2C multiplexer
-void selectTCAChannel(uint8_t channel) {
-    if (channel > 7) return;
-    Wire.beginTransmission(TCA9548A_ADDR);
-    Wire.write(1 << channel);
-    Wire.endTransmission();
+// Flat array of 14 DAC objects (indices 0–13)
+Adafruit_MCP4725 dac[TOTAL_DACS];
+
+/**
+ * Selects a channel (0–7) on the given TCA9548A.
+ * Writes a byte with only that bit set to the multiplexer’s control register.
+ * E.g., write (1 << channel) to select that channel:contentReference[oaicite:3]{index=3}.
+ */
+void tcaselect(uint8_t muxAddr, uint8_t channel) {
+  if (channel > 7) return;          // Invalid channel
+  Wire.beginTransmission(muxAddr);
+  Wire.write(1 << channel);
+  Wire.endTransmission();
 }
 
 //=========================
 // Pin Mapping Functions
 //=========================
 struct Weight { uint8_t layer, row, col, channel; };
-Weight weight_map[] = {{1,0,0,2},{1,0,1,3}};
+Weight weight_map[] = {
+    {1,0,0,6},
+    {1,0,1,9},
+    {1,0,2,11},
+    {2,0,0,4},
+    {2,1,0,5},
+    {2,2,0,3},
+};
 uint8_t W(uint8_t layer, uint8_t row, uint8_t col) {
     for (auto &w : weight_map) if (w.layer==layer && w.row==row && w.col==col) return w.channel;
     return 255;
 }
 
 struct Bias { uint8_t layer, row, channel; };
-Bias bias_map[] = {{1,0,4}};
+Bias bias_map[] = {
+    {1,0,6},
+    {1,1,8},
+    {1,3,10},
+    {2,0,1},
+};
 uint8_t b(uint8_t layer, uint8_t row) {
     for (auto &B : bias_map) if (B.layer==layer && B.row==row) return B.channel;
     return 255;
 }
 
 struct InputMap { uint8_t index, channel; };
-InputMap input_map[] = {{0,0},{1,1}};
+InputMap input_map[] = {
+    {0,2},
+};
 uint8_t I(uint8_t idx) {
     for (auto &i : input_map) if (i.index==idx) return i.channel;
     return 255;
 }
 
 struct OutputMap { uint8_t index, channel; };
-OutputMap output_map[] = {{0,0},{1,1},{2,2},{3,3},{5,5}};
+OutputMap output_map[] = {{0,0},{1,1},{2,2},{3,3},{4,4},{5,5}};
 uint8_t O(uint8_t idx) {
     for (auto &o : output_map) if (o.index==idx) return o.channel;
     return 255;
@@ -52,12 +78,29 @@ uint8_t O(uint8_t idx) {
 //=========================
 // Sets the specified DAC channel to a given voltage (0–Vref)
 // Returns true if success, false if invalid channel or voltage out of range
-bool setVoltage(uint8_t channel, float voltage) {
-    if (channel >= NUM_DACS) return false;
+bool setVoltage(uint8_t index, float voltage) {
+    if (index >= TOTAL_DACS) return false;
     if (voltage < 0.0 || voltage > Vref) return false;
     uint16_t value = (voltage / Vref) * 4095;
-    selectTCAChannel(channel);
-    dac[channel].setVoltage(value, false);
+    // Determine multiplexer and channel from index
+    uint8_t muxAddr;
+    uint8_t channel;
+    if (index < DAC_PER_MUX) {
+    muxAddr = MUX_ADDR1;          // Use first multiplexer
+    channel = index;              // Channels 0–6
+    } else {
+    muxAddr = MUX_ADDR2;          // Use second multiplexer
+    channel = index - DAC_PER_MUX; // Channels 0–6 for indices 7–13
+    }
+
+    // Select the appropriate channel and set DAC output
+    tcaselect(muxAddr, channel);
+    dac[index].setVoltage(value, false);  // Write voltage to the DAC
+
+    // Deselect (disable) all channels on this multiplexer by writing 0
+    Wire.beginTransmission(muxAddr);
+    Wire.write(0);
+    Wire.endTransmission();
     return true;
 }
 
@@ -88,22 +131,45 @@ bool is_ready = false;
 // Setup
 //=========================
 void setup() {
-    Serial.begin(9600);
+    Serial.begin(115200);
     Wire.begin();
     bool ok = true;
-    for (uint8_t i = 0; i < NUM_DACS; i++) {
-        selectTCAChannel(i);
-        if (!dac[i].begin(0x62)) {
+
+    // Initialize 7 DACs on first multiplexer (address 0x70)
+    for (uint8_t ch = 0; ch < DAC_PER_MUX; ch++) {
+        tcaselect(MUX_ADDR1, ch);        // Enable channel ch on first MUX
+        if (!dac[ch].begin(0x62)) {
             ok = false;
-            DynamicJsonDocument err(64);
-            err["error"] = "DAC init failed on channel " + String(i);
+            DynamicJsonDocument err(BYTES);
+            err["error"] = "DAC init failed on channel " + String(ch) + " MUX " + String(MUX_ADDR1);
             serializeJson(err, Serial);
             Serial.println();
-        }
+        }           // Default address for MCP4725 (A0=GND)
     }
+    // Initialize 7 DACs on second multiplexer (address 0x71)
+    for (uint8_t ch = 0; ch < DAC_PER_MUX; ch++) {
+        tcaselect(MUX_ADDR2, ch);        // Enable channel ch on second MUX
+        if (!dac[DAC_PER_MUX + ch].begin(0x62)) {
+            ok = false;
+            DynamicJsonDocument err(BYTES);
+            err["error"] = "DAC init failed on channel " + String(DAC_PER_MUX + ch) + " MUX " + String(MUX_ADDR2);
+            serializeJson(err, Serial);
+            Serial.println();
+        }           // Default address for MCP4725 (A0=GND)
+    }
+    
     if (!ok) {
         while (1); // Halt if any DAC failed
     }
+
+    // Deselect all channels on both multiplexers (write 0 to disable all)
+    Wire.beginTransmission(MUX_ADDR1);
+    Wire.write(0);
+    Wire.endTransmission();
+    Wire.beginTransmission(MUX_ADDR2);
+    Wire.write(0);
+    Wire.endTransmission();
+
     pinMode(LED_PIN, OUTPUT);
     digitalWrite(LED_PIN, LOW);
 }
@@ -111,7 +177,7 @@ void setup() {
 void loop() {
     if (!is_ready && Serial.available()) {
     String str = Serial.readStringUntil('\n');
-    DynamicJsonDocument hd(256);
+    DynamicJsonDocument hd(BYTES);
     if (deserializeJson(hd, str) == DeserializationError::Ok) {
       const char* c = hd["cmd"];
       if (c && String(c) == "handshake") {
@@ -124,8 +190,8 @@ void loop() {
     return;
   }
     if (is_ready && Serial.available()) {
-    String cmd = Serial.readStringUntil('\n');
-    processJson(cmd);
+    String json = Serial.readStringUntil('\n');
+    processJson(json);
   }
 }
 
@@ -133,19 +199,19 @@ void loop() {
 // JSON Processing
 //=========================
 void processJson(const String &json) {
-    DynamicJsonDocument doc(4096);
+    DynamicJsonDocument doc(BYTES);
     auto err = deserializeJson(doc, json);
     if (err) {
-        DynamicJsonDocument r(64); 
+        DynamicJsonDocument r(BYTES); 
         r["error"]="JSON parse error"; 
-        r["received"] = json;
+        r["received"] = json.substring(0,64);
         serializeJson(r, Serial); Serial.println(); return;
     }
     const char* cmd = doc["cmd"];
     if (!cmd) {
-        DynamicJsonDocument r(64); 
+        DynamicJsonDocument r(BYTES); 
         r["error"]="No cmd specified";
-        r["received"] = json;
+        r["received"] = json.substring(0,64);
         serializeJson(r, Serial); Serial.println(); return;
     }
 
@@ -156,9 +222,9 @@ void processJson(const String &json) {
                 for (size_t j=0;j<kv.value()[i].size();j++){
                     float val = kv.value()[i][j];
                     if (!setVoltage(W(layer,i,j), val + Vref/2.0)){
-                        DynamicJsonDocument r(64);
+                        DynamicJsonDocument r(BYTES);
                         r["error"] = "Invalid W";
-                        r["received"] = json;
+                        r["received"] = json.substring(0,64);
                         serializeJson(r,Serial);Serial.println(); return;
                     }
                 }
@@ -172,14 +238,14 @@ void processJson(const String &json) {
             for (size_t i=0;i<vals.size();i++){
                 float val = vals[i];
                 if (!setVoltage(b(layer,i), val + Vref/2.0)){
-                    DynamicJsonDocument r(64);
+                    DynamicJsonDocument r(BYTES);
                     r["error"] = "Invalid b";
-                    r["received"] = json;
+                    r["received"] = json.substring(0,64);
                     serializeJson(r,Serial);Serial.println(); return;
                 }
             }
         }
-        DynamicJsonDocument r(64); r["status"]="OK";
+        DynamicJsonDocument r(BYTES); r["status"]="OK";
         serializeJson(r,Serial); Serial.println();
         return;
     }
@@ -187,7 +253,7 @@ void processJson(const String &json) {
         // Forward propagation: always batch (nested arrays)
     else if (strcmp(cmd, "forward")==0) {
         JsonArray batch = doc["input"].as<JsonArray>();
-        DynamicJsonDocument r(4096);
+        DynamicJsonDocument r(BYTES);
         JsonArray outOuter = r.createNestedArray("output");
         
         // For each input vector in batch
@@ -197,9 +263,9 @@ void processJson(const String &json) {
             for (size_t i = 0; i < arr.size(); i++) {
                 float v = arr[i].as<float>();
                 if (!setVoltage(I(i), v)) {
-                    DynamicJsonDocument e(64);
+                    DynamicJsonDocument e(BYTES);
                     e["error"] = "Invalid input";
-                    e["received"] = json;
+                    e["received"] = json.substring(0,64);
                     serializeJson(e, Serial);
                     Serial.println();
                     return;
@@ -232,7 +298,7 @@ void processJson(const String &json) {
             if (sscanf(param+1, "%d", &idx)==1)
                 ok2=setVoltage(I(idx), value);
         }
-        DynamicJsonDocument r(64);
+        DynamicJsonDocument r(BYTES);
         r[ok2?"status":"error"] = ok2?"OK":"Invalid param or value";
         serializeJson(r,Serial);Serial.println();
         return;
@@ -241,7 +307,7 @@ void processJson(const String &json) {
     else if (strcmp(cmd, "read")==0) {
         int idx = doc["index"];
         uint8_t ch = O(idx);
-        DynamicJsonDocument r(64);
+        DynamicJsonDocument r(BYTES);
         if (ch<6) {
             int v=analogRead(ch);
             r["value"] = v * Vref / 1023.0;
@@ -251,7 +317,7 @@ void processJson(const String &json) {
     }
 
     else {
-        DynamicJsonDocument r(64); r["error"]="Unknown command"; r["received"] = json;
+        DynamicJsonDocument r(BYTES); r["error"]="Unknown command"; r["received"] = json.substring(0,64);
         serializeJson(r,Serial); Serial.println();
     }
 }
@@ -277,3 +343,4 @@ wsl --shutdown
 // reajust circuit to current code and vice versa 
 // tools for giving data the right shape for the circuit and problem
 // tools in python and arduino for graphing different components 
+

@@ -13,11 +13,11 @@ from encephalon.representations import auto_subplot, graph_3d, decision_boundary
 breast_cancer_dataset = sklearn.datasets.load_breast_cancer()
 X_full = breast_cancer_dataset.data        # shape (569, 30)
 y_full = breast_cancer_dataset.target      # shape (569, )
-
+print(breast_cancer_dataset.feature_names)
 # We choose two features: index 0 = 'mean radius', index 1 = 'mean texture'
 # (You can inspect breast_cancer_dataset.feature_names to pick other indices.)
 X_raw = X_full[:, [0, 1]]                  # shape (569, 2)
-
+xlabel,ylabel = "rayon moyen", "texture moyenne"
 # ─── 2) MIN–MAX NORMALIZE TO [0, 1] FOR EACH FEATURE ─────────────────────────
 #   (so our NN sees inputs in roughly the same range)
 mins = X_raw.min(axis=0)    # shape (2,)
@@ -86,6 +86,10 @@ to_plot = [
             y_min=0.0,
             y_max=1.0,
             n=25,
+            xlabel=xlabel,
+            ylabel=ylabel, 
+            zlabel="Y", 
+            title="Surface du réseau",
         ),
     ),
     (
@@ -101,6 +105,11 @@ to_plot = [
             # For visualization, we’ll color the positive class (y=1) vs. negative (y=0)
             data_0=[x for x, y in zip(X_norm, labels_all) if y == [0]],
             data_1=[x for x, y in zip(X_norm, labels_all) if y == [1]],
+            xlabel=xlabel,
+            ylabel=ylabel, 
+            title="Frontière de déscision du réseau",
+            class0name="Maligne 0",
+            class1name="Bénigne 1"
         ),
     ),
 ]

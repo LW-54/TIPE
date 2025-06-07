@@ -47,6 +47,7 @@ def graph_2d(
     x_min: float = 0,
     x_max: float = 5, 
     n: int = 20, 
+    func : Optional[Callable] = None,
     xlabel : str = "x",
     ylabel : str = "y",
     title : str = "Network plot",
@@ -67,6 +68,10 @@ def graph_2d(
             ax = fig.add_subplot(nrows,ncols,index)
 
     ax.plot(X.flatten(),model.use(X).flatten(),) # flatten to (n,)
+
+    if func :
+        ax.plot(X.flatten(),func(X).flatten(),)
+
     ax.set_xlabel(xlabel)
     ax.set_ylabel(ylabel)
     ax.set_title(title)

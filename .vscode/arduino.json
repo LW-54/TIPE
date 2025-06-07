@@ -1,5 +1,5 @@
 {
     "board": "arduino:avr:uno",
-    "sketch": "arduino/grapher/grapher.ino",
+    "sketch": "arduino/ANN/ANN.ino",
     "port": "/dev/ttyACM0"
 }

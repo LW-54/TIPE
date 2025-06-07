@@ -79,6 +79,7 @@ class NN:
             "W": {str(i): v.tolist() for i, v in self.W.items()},
             "b": {str(k): v.tolist() for k, v in self.b.items()},
         }
+        # self._log(payload)
         response = self.serial.send_and_receive(payload, expected_keys=["status"])
         if response["status"] != "OK":
             raise SerialProtocolError(f"Arduino failed to load weights and biases: {response}")
