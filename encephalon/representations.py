@@ -57,6 +57,23 @@ def graph_2d(
     ncols: Optional[int] = None, 
     index: Optional[int | tuple[int, int]] = None
     ) -> None :
+    """Graphs a 2D representation of the model's output.
+
+    Args:
+        model: The model to graph.
+        x_min: The minimum x value.
+        x_max: The maximum x value.
+        n: The number of points to plot.
+        func: A function to plot alongside the model's output.
+        xlabel: The label for the x-axis.
+        ylabel: The label for the y-axis.
+        title: The title of the plot.
+        ax: The matplotlib axes to plot on.
+        fig: The matplotlib figure to plot on.
+        nrows: The number of rows in the subplot grid.
+        ncols: The number of columns in the subplot grid.
+        index: The index of the subplot.
+    """
     
     X = np.linspace(x_min,x_max,n).reshape(-1,1)  # shape: (n, 1)
 
@@ -95,6 +112,25 @@ def graph_3d(
     ncols: Optional[int] = None, 
     index: Optional[int | tuple[int, int]] = None
     ) -> None :
+    """Graphs a 3D representation of the model's output.
+
+    Args:
+        model: The model to graph.
+        x_min: The minimum x value.
+        x_max: The maximum x value.
+        y_min: The minimum y value.
+        y_max: The maximum y value.
+        n: The number of points to plot.
+        xlabel: The label for the x-axis.
+        ylabel: The label for the y-axis.
+        zlabel: The label for the z-axis.
+        title: The title of the plot.
+        ax: The matplotlib axes to plot on.
+        fig: The matplotlib figure to plot on.
+        nrows: The number of rows in the subplot grid.
+        ncols: The number of columns in the subplot grid.
+        index: The index of the subplot.
+    """
 
     grid = np.array([
         [x, y] 
@@ -141,6 +177,29 @@ def decision_boundary(
     ncols: Optional[int] = None, 
     index: Optional[int | tuple[int, int]] = None
     ) -> None :
+    """Plots the decision boundary of a model.
+
+    Args:
+        model: The model to plot.
+        x_min: The minimum x value.
+        x_max: The maximum x value.
+        y_min: The minimum y value.
+        y_max: The maximum y value.
+        n: The number of points to plot.
+        boundary: The decision boundary.
+        data_0: The data for class 0.
+        data_1: The data for class 1.
+        xlabel: The label for the x-axis.
+        ylabel: The label for the y-axis.
+        title: The title of the plot.
+        class0name: The name of class 0.
+        class1name: The name of class 1.
+        ax: The matplotlib axes to plot on.
+        fig: The matplotlib figure to plot on.
+        nrows: The number of rows in the subplot grid.
+        ncols: The number of columns in the subplot grid.
+        index: The index of the subplot.
+    """
 
     # Step 1: Create a meshgrid
     x = np.linspace(x_min, x_max, n)
@@ -177,4 +236,3 @@ def decision_boundary(
     ax.set_title(title)
     ax.legend()
     ax.grid(True)
-

@@ -23,6 +23,12 @@ from .types_and_functions import (
 
 
 class NN:
+    """A class representing a neural network.
+
+    This class provides a high-level interface for training and using a neural
+    network. It communicates with a hardware-accelerated implementation of the
+    network via a serial interface.
+    """
     def __init__(
         self,
         serial_interface: SerialJSONInterface,
@@ -32,6 +38,18 @@ class NN:
         g: activation_function_type = Id,
         verbose: bool = False,
     ) -> None:
+        """Initializes the neural network.
+
+        Args:
+            serial_interface: An instance of SerialJSONInterface for communicating
+                with the Arduino.
+            layers: A list of integers representing the number of neurons in each
+                layer of the neural network.
+            name: The name of the model.
+            f: The activation function to use for the hidden layers.
+            g: The activation function to use for the output layer.
+            verbose: If True, print verbose output.
+        """
         
         if not all(isinstance(n, int) and n > 0 for n in layers):
             raise ValueError("All layer sizes must be positive integers.")
@@ -74,6 +92,7 @@ class NN:
             self.b[i] = np.clip(self.b[i], min_value, max_value)
 
     def set_weights_and_biases(self) -> None:
+        """Sets the weights and biases of the network on the Arduino."""
         payload = {
             "cmd": "set_weights_and_biases",
             "W": {str(i): v.tolist() for i, v in self.W.items()},
@@ -85,6 +104,14 @@ class NN:
             raise SerialProtocolError(f"Arduino failed to load weights and biases: {response}")
 
     def use(self, X: np.ndarray) -> np.ndarray:
+        """Uses the neural network to predict the output for a given input.
+
+        Args:
+            X: The input to the neural network.
+
+        Returns:
+            The output of the neural network.
+        """
         X = np.array(X, ndmin=2)
 
         if X.shape[1] != self.layers[0]:
@@ -157,6 +184,11 @@ class NN:
         self.set_weights_and_biases() 
 
     def save(self, filepath: str) -> None:
+        """Saves the model to a file.
+
+        Args:
+            filepath: The path to the file to save the model to.
+        """
         payload = {
             "metadata": {
                 "name": self.name,
@@ -171,6 +203,11 @@ class NN:
         self._log(f"[{self.name}] Saved to JSON: {filepath}")
 
     def load(self, filepath: str) -> None:
+        """Loads a model from a file.
+
+        Args:
+            filepath: The path to the file to load the model from.
+        """
         with open(filepath, "r") as f:
             payload = json.load(f)
 
@@ -200,6 +237,26 @@ class NN:
         print_step: int = 10,
         graphing: bool = True,
     ) -> None:
+        """Trains the neural network.
+
+        Args:
+            data: The training data.
+            labels: The training labels.
+            epochs: The number of epochs to train for.
+            learning_rate: The learning rate.
+            learning_rate_optimiser: The learning rate optimiser.
+            loss_function: The loss function.
+            lambda_reg: The regularization parameter.
+            batch_size: The batch size.
+            saving: If True, save the model periodically.
+            save_step: The number of epochs between saves.
+            saving_improvement: The minimum improvement in loss required to save the
+                model.
+            loss_min_init: The initial minimum loss.
+            verbose: If True, print verbose output.
+            print_step: The number of epochs between prints.
+            graphing: If True, graph the training loss.
+        """
         if verbose:
             self.verbose = verbose
 

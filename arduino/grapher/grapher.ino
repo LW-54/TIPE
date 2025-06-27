@@ -16,9 +16,10 @@
 Adafruit_MCP4725 dac[TOTAL_DACS];
 
 /**
- * Selects a channel (0–7) on the given TCA9548A.
- * Writes a byte with only that bit set to the multiplexer’s control register.
- * E.g., write (1 << channel) to select that channel:contentReference[oaicite:3]{index=3}.
+ * @brief Selects a channel on a TCA9548A I2C multiplexer.
+ * 
+ * @param muxAddr The I2C address of the multiplexer.
+ * @param channel The channel to select (0-7).
  */
 void tcaselect(uint8_t muxAddr, uint8_t channel) {
   if (channel > 7) return;          // Invalid channel
@@ -33,6 +34,12 @@ void tcaselect(uint8_t muxAddr, uint8_t channel) {
 
 struct InputMap { uint8_t index, channel; };
 InputMap input_map[] = {{0,0},{1,1},{2,2},{3,3},{4,4},{5,5},{6,6},{7,7},{8,8},{9,9},{10,10},{11,11},{12,12},{13,13}};
+/**
+ * @brief Gets the DAC channel for a given input.
+ * 
+ * @param idx The index of the input.
+ * @return The DAC channel for the input, or 255 if not found.
+ */
 uint8_t I(uint8_t idx) {
     for (auto &i : input_map) if (i.index==idx) return i.channel;
     return 255;
@@ -40,6 +47,12 @@ uint8_t I(uint8_t idx) {
 
 struct OutputMap { uint8_t index, channel; };
 OutputMap output_map[] = {{0,0},{1,1},{2,2},{3,3},{4,4},{5,5}};
+/**
+ * @brief Gets the ADC channel for a given output.
+ * 
+ * @param idx The index of the output.
+ * @return The ADC channel for the output, or 255 if not found.
+ */
 uint8_t O(uint8_t idx) {
     for (auto &o : output_map) if (o.index==idx) return o.channel;
     return 255;
@@ -48,8 +61,13 @@ uint8_t O(uint8_t idx) {
 //=========================
 // DAC Write Function
 //=========================
-// Sets the specified DAC channel to a given voltage (0–Vref)
-// Returns true if success, false if invalid channel or voltage out of range
+/**
+ * @brief Sets the voltage of a DAC.
+ * 
+ * @param index The index of the DAC to set.
+ * @param voltage The voltage to set the DAC to.
+ * @return True if the voltage was set successfully, false otherwise.
+ */
 bool setVoltage(uint8_t index, float voltage) {
     if (index >= TOTAL_DACS) return false;
     if (voltage < 0.0 || voltage > Vref) return false;
@@ -79,7 +97,11 @@ bool setVoltage(uint8_t index, float voltage) {
 //=========================
 // Read Outputs
 //=========================
-// Reads outputs in sorted order of index
+/**
+ * @brief Reads all the outputs from the ADC and adds them to a JSON array.
+ * 
+ * @param outer The JSON array to add the outputs to.
+ */
 void readAllOutputs(JsonArray &outer) {
     uint8_t max_index = 0;
     for (auto &o : output_map) if (o.index > max_index) max_index = o.index;
@@ -170,6 +192,11 @@ void loop() {
 //=========================
 // JSON Processing
 //=========================
+/**
+ * @brief Processes a JSON command received over serial.
+ * 
+ * @param json The JSON string to process.
+ */
 void processJson(const String &json) {
     DynamicJsonDocument doc(4096);
     auto err = deserializeJson(doc, json);

@@ -1,3 +1,5 @@
+
+
 import json
 import threading
 import time
@@ -282,6 +284,16 @@ def simulate_serial(response_callback: Callable[[Dict[str, Any]], Dict[str, Any]
     return SerialJSONInterface(serial_inst=serial_inst), simulator
 
 def handshake(interface : SerialJSONInterface, max_retries: int = 3, retry_delay: float = 1.0) -> None:
+    """Performs a handshake with the Arduino.
+
+    Args:
+        interface: The serial interface to use.
+        max_retries: The maximum number of times to retry the handshake.
+        retry_delay: The delay between retries.
+
+    Raises:
+        SerialCommunicationError: If the handshake fails.
+    """
     for attempt in range(1, max_retries+1):
         try:
             interface.send_command({"cmd": "handshake"})

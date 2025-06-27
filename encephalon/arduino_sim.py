@@ -11,6 +11,23 @@ def make_arduino_simulator(
     f: activation_function_type = ReLU,
     noise_amplitude: float = 0.0
 ) -> Callable[[dict], dict]:
+    """Creates a simulator for the Arduino-based neural network.
+
+    This function returns a callback that simulates the behavior of the Arduino
+    firmware. The simulator can be used for testing and development without
+    requiring a physical Arduino board.
+
+    Args:
+        layers: A list of integers representing the number of neurons in each
+            layer of the neural network.
+        f: The activation function to use for the hidden layers.
+        noise_amplitude: The amplitude of noise to add to the output of the
+            network.
+
+    Returns:
+        A callback function that takes a message dictionary and returns a
+        response dictionary, simulating the Arduino's behavior.
+    """
 
     fwd_f, back_f = f
 

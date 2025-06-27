@@ -26,7 +26,12 @@ float W[MAX_LAYERS][MAX_NEURONS][MAX_NEURONS];
 float b[MAX_LAYERS][MAX_NEURONS];
 float I_vec[MAX_NEURONS];
 
-// Forward pass
+/**
+ * @brief Performs a forward pass through the neural network.
+ * 
+ * @param X The input vector.
+ * @param Y The output vector.
+ */
 void forward_once(const float* X, float* Y) {
   static float A[MAX_NEURONS], Z[MAX_NEURONS];
   for (uint8_t i = 0; i < layers[0]; i++) A[i] = X[i];
@@ -74,6 +79,11 @@ void loop() {
   }
 }
 
+/**
+ * @brief Processes a JSON command received over serial.
+ * 
+ * @param json The JSON string to process.
+ */
 void processJson(const String &json) {
   DynamicJsonDocument doc(4096);
   auto err = deserializeJson(doc, json);
@@ -180,5 +190,3 @@ void processJson(const String &json) {
       serializeJson(r,Serial); Serial.println();
   }
 }
-
-
